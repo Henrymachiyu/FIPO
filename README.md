@@ -4,19 +4,20 @@
 
 **Qwen Pilot, Alibaba Group | Published on March 20, 2026**
 
-FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base model. The central idea is simple: GRPO-style training works, but its token credit assignment is too coarse. FIPO densifies that signal with a discounted Future-KL term that reflects how the rest of the trajectory evolves after each token.
+FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base model. The central idea is simple: GRPO-style training works, but its token credit assignment is too coarse. FIPO densifies that signal with a discounted Future-KL term that reflects how the rest of the trajectory evolves after each token. Empirically, we find that this granular reinforcement allows the model to break through the length stagnation observed in standard baselines. Evaluated on Qwen2.5-32B-Base, FIPO extends the average chain-of-thought length from 4,000 to over 10,000 tokens, driving AIME 2024 Pass@1 accuracy from 50.0% to a peak of 58.0%.
 
 ## Overview
 
 ![Figure 1 overview](assets/readme/fig1.png)
 
-*Figure 1. FIPO vs. baselines on AIME 2024. FIPO shows that pure RL training alone can outperform reproduced pure-RL baselines such as DAPO and DeepSeek-R1-Zero-32B, while also producing substantially longer responses on average.*
+*Figure 1. FIPO vs. baselines on AIME 2024. FIPO shows that pure RL training alone can outperform reproduced pure-RL baselines such as DAPO and DeepSeek-R1-Zero-32B, surpass o1-mini, and produce substantially longer responses on average.*
 
-- FIPO is a **value-free RL algorithm** designed to overcome reasoning bottlenecks in ORM-based GRPO training.
-- Standard GRPO assigns the same outcome-level advantage to every token in a trajectory. We argue that this **coarse credit assignment** creates a lower ceiling, because the model cannot distinguish critical reasoning steps from routine continuation tokens.
-- FIPO replaces that uniform treatment with a **dense advantage formulation**: each token is reweighted by the discounted signed policy shift of its future trajectory.
-- On **Qwen2.5-32B-Base**, FIPO breaks the typical reasoning-length plateau, extending average chain-of-thought length from roughly **4,000** to **10,000+** tokens and improving **AIME 2024 Pass@1** from **50.0%** to a peak of **58.0%**.
-- More broadly, FIPO suggests that improving **advantage density inside the GRPO framework** is a promising path for eliciting deep reasoning without relying on long-CoT SFT or a separate value model.
+**Highlights**
+
+- **Pure RL only:** FIPO outperforms reproduced DAPO and DeepSeek-R1-Zero-32B, and surpasses o1-mini on AIME 2024.
+- **Dense advantage formulation:** instead of assigning one uniform outcome-level signal to all tokens, FIPO reweights each token by the discounted signed shift of its future trajectory.
+- **Longer reasoning:** on Qwen2.5-32B-Base, FIPO breaks the usual 4k-token plateau and extends average reasoning length to **10,000+** tokens.
+- **Stronger performance:** AIME 2024 Pass@1 improves from **50.0%** to a peak of **58.0%**.
 
 ## Core Change
 
