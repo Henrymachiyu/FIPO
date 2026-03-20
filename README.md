@@ -4,7 +4,7 @@
 
 **Qwen Pilot, Alibaba Group | Published on March 20, 2026**
 
-FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base model. The central idea is simple: GRPO-style training works, but its token credit assignment is too coarse. FIPO densifies that signal with a discounted Future-KL term that reflects how the rest of the trajectory evolves after each token. Empirically, we find that this granular reinforcement allows the model to break through the length stagnation observed in standard baselines. Evaluated on Qwen2.5-32B-Base, FIPO extends the average chain-of-thought length from 4,000 to over 10,000 tokens, driving AIME 2024 Pass@1 accuracy from 50.0% to a peak of 58.0%.
+FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean base model. The central idea is simple: **GRPO-style training works, but its token credit assignment is too coarse**. FIPO densifies that signal with a **discounted Future-KL term** that reflects how the rest of the trajectory evolves after each token. Empirically, we find that this granular reinforcement allows the model to **break through the length stagnation** observed in standard baselines. Evaluated on **Qwen2.5-32B-Base**, FIPO extends the average chain-of-thought length from **4,000 to over 10,000 tokens**, driving **AIME 2024 Pass@1** accuracy from **50.0% to a peak of 58.0%**.
 
 ## Overview
 
@@ -40,6 +40,11 @@ FIPO maps this future signal into a bounded influence weight:
 $$
 f_t = clip(\exp(FutureKL_t), 1-\epsilon_{f,low}, 1+\epsilon_{f,high}), \quad \tilde{A}_t = \hat{A}_t \cdot f_t
 $$
+
+```text
+FutureKL_t = discounted_sum_of_future_logprob_shifts(t)
+weighted_advantage_t = A_t * clip(exp(FutureKL_t), low, high)
+```
 
 Tokens that lead into preferred futures are **amplified**, while tokens that lead into suppressed futures are **attenuated**. Clipping keeps this modulation stable. The final DAPO-style loss therefore stays clipped and simple, but the advantage term becomes **future-aware** rather than uniformly inherited from the final outcome.
 
