@@ -7,7 +7,7 @@
 
 
 
-FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean base model (<font color="red">First pure-RL recipe to surpass o1-mini on AIME 2024</font>). The central idea is simple: **GRPO-style training works, but its token credit assignment is too coarse**. FIPO densifies that signal with a **discounted Future-KL term** that reflects how the rest of the trajectory evolves after each token. Empirically, this granular reinforcement allows the model to **break through the length stagnation** observed in standard baselines. Trained on **Qwen2.5-32B-Base**, FIPO extends the average chain-of-thought length from **4,000 to over 10,000 tokens**, driving **AIME 2024 Pass@1** accuracy from **50.0% to a peak of 58.0% compared with DAPO**.
+FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean base model (**First pure-RL recipe to surpass o1-mini**). The central idea is simple: *RPO-style training works, but its token credit assignment is too coarse. FIPO densifies that signal with a **discounted Future-KL term** that reflects how the rest of the trajectory evolves after each token. Empirically, this granular reinforcement allows the model to **break through the length stagnation** observed in standard baselines. Trained on Qwen2.5-32B-Base, FIPO extends the average chain-of-thought length from **4,000 to over 10,000 tokens**, driving AIME 2024 Pass@1 accuracy from **50.0% to a peak of 58.0% compared with DAPO**.
 
 ## Overview
 
