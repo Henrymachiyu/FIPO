@@ -39,7 +39,7 @@ FIPO keeps the standard PPO/DAPO scaffold, but changes how token-level updates a
 FIPO starts from the signed log-probability difference between the current policy and the old policy:
 
 $$
-\Delta \log p_t = \log \pi_\theta(y_t \mid x, y_{<t}) - \log \pi_{\text{old}}(y_t \mid x, y_{<t})
+\Delta \log p_t = \log \pi_\theta(y_t \mid x, y_{1:t-1}) - \log \pi_{old}(y_t \mid x, y_{1:t-1})
 $$
 
 This quantity is treated as a directional signal of local policy movement:
@@ -54,7 +54,7 @@ Unlike a standard KL penalty, FIPO uses this drift as a signal of **behavioral a
 To capture the downstream effect of a token on the rest of the sampled reasoning chain, FIPO accumulates discounted signed probability shifts over the future trajectory:
 
 $$
-\mathrm{FutureKL}_t = \sum_{k=t}^{T} M_k \cdot \gamma^{k-t} \cdot \Delta \log p_k
+FutureKL_t = \sum_{k=t}^{T} M_k \cdot \gamma^{k-t} \cdot \Delta \log p_k
 $$
 
 Here, the decay factor models diminishing causal dependency over longer horizons, while the mask removes extreme negative-advantage outliers that would otherwise destabilize the accumulation.
@@ -72,7 +72,7 @@ This is the core intuition behind FIPO: **the value of a token depends on the fu
 FIPO maps Future-KL into a bounded multiplicative influence weight:
 
 $$
-f_t = \operatorname{clip}\left(\exp(\mathrm{FutureKL}_t), 1-\epsilon_{f,\mathrm{low}}, 1+\epsilon_{f,\mathrm{high}}\right), \quad \tilde{A}_t = \hat{A}_t \cdot f_t
+f_t = clip(\exp(FutureKL_t), 1-\epsilon_{f,low}, 1+\epsilon_{f,high}), \quad \tilde{A}_t = \hat{A}_t \cdot f_t
 $$
 
 Operationally:
