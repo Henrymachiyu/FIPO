@@ -137,7 +137,17 @@ The paper also tracks response-length growth, entropy, reward, and related train
 
 ## 🎈 Citation
 
-BibTeX will be added once the final citation metadata is ready.
+If you find this work useful, please cite:
+
+```bibtex
+@misc{FIPO,
+  title = {FIPO: Eliciting Deep Reasoning with Future-KL Influenced Policy Optimization},
+  url = {https://qwen-pilot.notion.site/FIPO-Eliciting-Deep-Reasoning-with-Future-KL-Influenced-Policy-Optimization-30db3eba1add809f9c5df0bed414cec7},
+  author={Chiyu Ma and Shuo Yang and Kexin Huang and Jinda Lu and Haoming Meng and Shangshang Wang and Bolin Ding and Soroush Vosoughi and Guoyin Wang and Jingren Zhou},
+  year = {2026},
+  month = {March},
+}
+```
 
 ## 🌻 Acknowledgement
 
