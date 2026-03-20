@@ -38,9 +38,9 @@ FIPO keeps the standard PPO/DAPO scaffold, but changes how token-level updates a
 
 FIPO starts from the signed log-probability difference between the current policy and the old policy:
 
-```math
+$$
 \Delta \log p_t = \log \pi_\theta(y_t \mid x, y_{<t}) - \log \pi_{\text{old}}(y_t \mid x, y_{<t})
-```
+$$
 
 This quantity is treated as a directional signal of local policy movement:
 
@@ -53,9 +53,9 @@ Unlike a standard KL penalty, FIPO uses this drift as a signal of **behavioral a
 
 To capture the downstream effect of a token on the rest of the sampled reasoning chain, FIPO accumulates discounted signed probability shifts over the future trajectory:
 
-```math
+$$
 \mathrm{FutureKL}_t = \sum_{k=t}^{T} M_k \cdot \gamma^{k-t} \cdot \Delta \log p_k
-```
+$$
 
 Here, the decay factor models diminishing causal dependency over longer horizons, while the mask removes extreme negative-advantage outliers that would otherwise destabilize the accumulation.
 
@@ -71,9 +71,9 @@ This is the core intuition behind FIPO: **the value of a token depends on the fu
 
 FIPO maps Future-KL into a bounded multiplicative influence weight:
 
-```math
+$$
 f_t = \operatorname{clip}\left(\exp(\mathrm{FutureKL}_t), 1-\epsilon_{f,\mathrm{low}}, 1+\epsilon_{f,\mathrm{high}}\right), \quad \tilde{A}_t = \hat{A}_t \cdot f_t
-```
+$$
 
 Operationally:
 
@@ -82,19 +82,6 @@ Operationally:
 - Clipping keeps that modulation controlled and numerically stable.
 
 Under the token-level DAPO formulation, the final FIPO loss remains a clipped policy-gradient objective, but the advantage term is now **future-aware** rather than uniformly inherited from the final outcome.
-
-### Why This Matters in Practice
-
-FIPO is appealing because it achieves dense token-level supervision **without introducing a value model**. In other words, it stays close to the efficiency and simplicity of GRPO/DAPO, while addressing the exact place where these methods often struggle most: sustaining coherent long-range reasoning growth.
-
-In this repo, the implementation is mainly localized to:
-
-- `verl/trainer/ppo/core_algos.py`
-- `verl/workers/config/actor.py`
-- `verl/workers/actor/dp_actor.py`
-- `verl/workers/actor/megatron_actor.py`
-
-The provided 32B launcher enables `future_kl` loss together with the corresponding decay, clipping, and safety controls used in our main experiments.
 
 ## Getting Started
 
@@ -125,7 +112,6 @@ cd FIPO
 bash recipe/fipo/run_fipo_qwen2.5_32b.sh
 ```
 
-The script keeps the DAPO-style defaults and leaves the major paths env-overridable, including `MODEL_PATH`, `TRAIN_FILE`, `TEST_FILE`, `CKPTS_DIR`, and `NNODES`.
 
 ## What changed in the scripts?
 
