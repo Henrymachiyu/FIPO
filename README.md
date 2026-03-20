@@ -4,7 +4,7 @@
 
 **Qwen Pilot, Alibaba Group | Published on March 20, 2026**
 
-FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean base model. The central idea is simple: **GRPO-style training works, but its token credit assignment is too coarse**. FIPO densifies that signal with a **discounted Future-KL term** that reflects how the rest of the trajectory evolves after each token. Empirically, we find that this granular reinforcement allows the model to **break through the length stagnation** observed in standard baselines. Evaluated on **Qwen2.5-32B-Base**, FIPO extends the average chain-of-thought length from **4,000 to over 10,000 tokens**, driving **AIME 2024 Pass@1** accuracy from **50.0% to a peak of 58.0%**.
+FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean base model. The central idea is simple: **GRPO-style training works, but its token credit assignment is too coarse**. FIPO densifies that signal with a **discounted Future-KL term** that reflects how the rest of the trajectory evolves after each token. <span style="color:#d73a49"><strong>FIPO is the first pure-RL recipe to surpass o1-mini on AIME 2024.</strong></span> Empirically, this granular reinforcement allows the model to **break through the length stagnation** observed in standard baselines. Trained on **Qwen2.5-32B-Base**, FIPO extends the average chain-of-thought length from **4,000 to over 10,000 tokens**, driving **AIME 2024 Pass@1** accuracy from **50.0% to a peak of 58.0% compared with DAPO**.
 
 ## Overview
 
@@ -45,6 +45,18 @@ $$
 FutureKL_t = discounted_sum_of_future_logprob_shifts(t)
 weighted_advantage_t = A_t * clip(exp(FutureKL_t), low, high)
 ```
+
+The final token-level FIPO loss keeps the standard clipped PPO/DAPO form, but replaces the original advantage with the future-aware one:
+
+$$
+r_t = \frac{\pi_\theta(y_t \mid x, y_{1:t-1})}{\pi_{old}(y_t \mid x, y_{1:t-1})}
+$$
+
+$$
+L_t^{FIPO} = min(r_t \tilde{A}_t,\; clip(r_t, 1-\epsilon, 1+\epsilon)\tilde{A}_t)
+$$
+
+
 
 Tokens that lead into preferred futures are **amplified**, while tokens that lead into suppressed futures are **attenuated**. Clipping keeps this modulation stable. The final DAPO-style loss therefore stays clipped and simple, but the advantage term becomes **future-aware** rather than uniformly inherited from the final outcome.
 
