@@ -4,15 +4,7 @@
 
 **Qwen Pilot, Alibaba Group | Published on March 20, 2026**
 
-FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base model. The central idea is simple: outcome-based GRPO training is effective, but its credit assignment is too coarse. FIPO densifies that signal by reweighting token-level updates with a discounted Future-KL term that reflects how the rest of the trajectory evolves after each token.
-
-## Summary
-
-- We introduce **Future-KL Influenced Policy Optimization (FIPO)**, a reinforcement learning algorithm designed to overcome reasoning bottlenecks in ORM-based GRPO training.
-- Standard GRPO assigns the same outcome-level advantage to every token in a trajectory. We argue that this **coarse-grained credit assignment** creates a lower performance ceiling, because the model cannot distinguish critical reasoning pivots from trivial continuation tokens.
-- FIPO replaces that uniform treatment with a **dense advantage formulation**: each token is reweighted according to the discounted signed policy shift of its future trajectory.
-- On **Qwen2.5-32B-Base**, FIPO breaks the typical reasoning-length plateau of standard baselines, extends average chain-of-thought length from roughly **4,000** to **over 10,000** tokens, and improves **AIME 2024 Pass@1** from **50.0%** to a peak of **58.0%**.
-- More broadly, FIPO suggests that improving **advantage density inside the GRPO framework** is a promising direction for eliciting deep reasoning without relying on long-CoT SFT or a separate value model.
+FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base model. The central idea is simple: GRPO-style training works, but its token credit assignment is too coarse. FIPO densifies that signal with a discounted Future-KL term that reflects how the rest of the trajectory evolves after each token.
 
 ## Introduction
 
@@ -20,68 +12,39 @@ FIPO is a value-free RL recipe for eliciting deeper reasoning from a clean base 
 
 *Figure 1. FIPO vs. baselines on AIME 2024. FIPO shows that pure RL training alone can outperform reproduced pure-RL baselines such as DAPO and DeepSeek-R1-Zero-32B, while also producing substantially longer responses on average.*
 
-Modern reasoning models increasingly rely on **inference-time scaling**: reinforcement learning drives longer and more deliberate chains of thought. But reproducing that behavior cleanly in the open remains difficult, since many strong pipelines still depend on undisclosed tricks, long-CoT supervision, or critic-based guidance.
+Modern reasoning models increasingly rely on **inference-time scaling**: reinforcement learning pushes them toward longer and more deliberate chains of thought. But reproducing that behavior cleanly in the open remains difficult, especially without long-CoT supervision or a separate critic.
 
-This motivates a core question:
+This motivates a simple question:
 
 > Can we elicit deep reasoning from a clean base model, without relying on long-CoT synthetic data or critic-based token supervision?
 
-Value-free recipes such as DAPO show that GRPO-style training can already improve reasoning. However, they often hit a structural ceiling: response length grows at first, then stalls around the 4k-token regime. We view this as a **coarse credit-assignment** problem. When every token receives the same final-answer-derived advantage, the optimizer cannot distinguish critical reasoning pivots from routine continuation tokens.
+Value-free recipes such as DAPO show that GRPO-style training can already improve reasoning, but they often plateau around the 4k-token regime. We view this as a **coarse credit-assignment** problem: if every token receives the same outcome-level advantage, the optimizer cannot distinguish critical reasoning pivots from routine continuation tokens.
 
-FIPO addresses this limitation with a **future-aware token reweighting mechanism**. Instead of only asking whether a sampled response is correct, FIPO also asks whether the updated policy is reinforcing or suppressing the **future trajectory initiated by each token**. This yields a denser training signal while staying inside a critic-free GRPO-style loop.
+FIPO addresses this limitation with a **future-aware token reweighting mechanism**. Instead of only asking whether a sampled response is correct, FIPO also asks whether the updated policy is reinforcing or suppressing the **future trajectory initiated by each token**. This yields a denser training signal while staying inside a critic-free GRPO-style loop. On **Qwen2.5-32B-Base**, this pushes average reasoning length from roughly **4,000** to **10,000+** tokens and improves **AIME 2024 Pass@1** from **50.0%** to a peak of **58.0%**.
 
 ## Core Change
 
-FIPO keeps the standard PPO/DAPO scaffold, but changes how token-level updates are weighted. The core idea is to reward tokens that lead into futures the updated policy prefers, and down-weight tokens that lead into futures it is already moving away from.
-
-### Probability Shift as the Atomic Signal
-
-FIPO starts from the signed log-probability difference between the current policy and the old policy:
+FIPO keeps the standard PPO/DAPO scaffold, but changes how token-level updates are weighted. The local signal is the signed log-probability shift between the current and old policy:
 
 $$
 \Delta \log p_t = \log \pi_\theta(y_t \mid x, y_{1:t-1}) - \log \pi_{old}(y_t \mid x, y_{1:t-1})
 $$
 
-This quantity is treated as a directional signal of local policy movement:
-
-- If `Δ log p_t > 0`, the updated policy is reinforcing that token.
-- If `Δ log p_t < 0`, the updated policy is suppressing that token.
-
-Unlike a standard KL penalty, FIPO uses this drift as a signal of **behavioral adjustment**. But reasoning is sequential, so a local shift alone is not enough.
-
-### Future-KL as Forward-Looking Credit Assignment
-
-To capture the downstream effect of a token on the rest of the sampled reasoning chain, FIPO accumulates discounted signed probability shifts over the future trajectory:
+Positive values mean the token is being reinforced, while negative values mean it is being suppressed. Since reasoning is sequential, FIPO then accumulates this signal over the future trajectory:
 
 $$
 FutureKL_t = \sum_{k=t}^{T} M_k \cdot \gamma^{k-t} \cdot \Delta \log p_k
 $$
 
-Here, the decay factor models diminishing causal dependency over longer horizons, while the mask removes extreme negative-advantage outliers that would otherwise destabilize the accumulation.
+Positive `FutureKL_t` means the future following token `t` is being reinforced; negative `FutureKL_t` means it is being suppressed. The decay window keeps the signal local enough to stay stable, while the mask removes extreme-ratio outliers.
 
-Functionally:
-
-- Positive `FutureKL_t` means the future trajectory following token `t` is being reinforced.
-- Negative `FutureKL_t` means that future trajectory is being suppressed.
-- The decay window keeps the signal focused on the effective reasoning horizon instead of letting distant stochasticity dominate.
-
-This is the core intuition behind FIPO: **the value of a token depends on the future it leads into.**
-
-### Future-KL Reweighted Objective
-
-FIPO maps Future-KL into a bounded multiplicative influence weight:
+FIPO maps this future signal into a bounded influence weight:
 
 $$
 f_t = clip(\exp(FutureKL_t), 1-\epsilon_{f,low}, 1+\epsilon_{f,high}), \quad \tilde{A}_t = \hat{A}_t \cdot f_t
 $$
 
-Operationally:
-
-- If a token leads into a future the updated policy prefers, its update is **amplified**.
-- If a token leads into a future the policy is suppressing, its update is **attenuated**.
-- Clipping keeps that modulation controlled and numerically stable.
-
-Under the token-level DAPO formulation, the final FIPO loss remains a clipped policy-gradient objective, but the advantage term is now **future-aware** rather than uniformly inherited from the final outcome.
+Tokens that lead into preferred futures are **amplified**, while tokens that lead into suppressed futures are **attenuated**. Clipping keeps this modulation stable. The final DAPO-style loss therefore stays clipped and simple, but the advantage term becomes **future-aware** rather than uniformly inherited from the final outcome.
 
 ## Getting Started
 
