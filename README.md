@@ -46,12 +46,14 @@ Tokens that lead into preferred futures are **amplified**, while tokens that lea
 
 FIPO is built on top of the existing VeRL and DAPO training stack in this repository.
 
+- For environment setup, please follow the standard VeRL installation and runtime setup first.
 - Follow the standard VeRL environment setup and cluster preparation flow.
 - Reuse the same Ray runtime pattern as the DAPO recipe.
 - Use the new FIPO launcher in `recipe/fipo/` as the default 32B entrypoint.
 
 Useful local references:
 
+- VeRL docs: <https://verl.readthedocs.io/en/latest/start/install.html>
 - DAPO recipe overview: [`recipe/dapo/README.md`](./recipe/dapo/README.md)
 - DAPO baseline launcher: [`recipe/dapo/run_dapo_qwen2.5_32b.sh`](./recipe/dapo/run_dapo_qwen2.5_32b.sh)
 - FIPO launcher: [`recipe/fipo/run_fipo_qwen2.5_32b.sh`](./recipe/fipo/run_fipo_qwen2.5_32b.sh)
