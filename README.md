@@ -19,7 +19,7 @@ FIPO is a **value-free RL recipe** for eliciting deeper reasoning from a clean b
 
 - **Pure RL only:** FIPO outperforms reproduced DAPO and DeepSeek-R1-Zero-32B, and surpasses o1-mini on AIME 2024.
 - **Dense advantage formulation:** instead of assigning one uniform outcome-level signal to all tokens, FIPO reweights each token by the discounted signed shift of its future trajectory.
-- **Longer reasoning:** on Qwen2.5-32B-Base, FIPO breaks the usual 4k-token plateau and extends average reasoning length to **10,000+** tokens.
+- **Deeper reasoning:** on Qwen2.5-32B-Base, FIPO breaks the usual 4k-token plateau and extends average reasoning length to **10,000+** tokens.
 - **Stronger performance:** AIME 2024 Pass@1 improves from **50.0%** to a peak of **58.0%**.
 
 ## Core Change
