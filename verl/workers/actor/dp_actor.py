@@ -440,16 +440,7 @@ class DataParallelPPOActor(BasePPOActor):
                         loss_agg_mode=loss_agg_mode,
                         config=self.config,
                     )
-                    #     pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower, influence_weights_mean, influence_weights_min, influence_weights_max \
-                    #         , valid_token_ratio_min, valid_token_ratio_max, valid_future_ratio_50, valid_future_ratio_75, valid_future_ratio_90, valid_token_ratio_50, valid_token_ratio_75, valid_token_ratio_90 \
-                    #             = policy_loss_fn(
-                    #     old_log_prob=old_log_prob,
-                    #     log_prob=log_prob,
-                    #     advantages=advantages,
-                    #     response_mask=response_mask,
-                    #     loss_agg_mode=loss_agg_mode,
-                    #     config=self.config,
-                    # )
+
                         micro_batch_metrics["actor/influence_weights_mean"] = influence_weights_mean.detach().item()
                         # micro_batch_metrics["actor/influence_weights_std"] = influence_weights_std.detach().item()
                         micro_batch_metrics["actor/influence_weights_min"] = influence_weights_min.detach().item()
@@ -504,7 +495,6 @@ class DataParallelPPOActor(BasePPOActor):
                             config=self.config,
                         )
                         micro_batch_metrics.update(pg_metrics)
-                    # 开始save response token 和对应的response rollout
                     
                     if entropy_coeff != 0:
                         entropy_loss = agg_loss(loss_mat=entropy, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
