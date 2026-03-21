@@ -894,14 +894,12 @@ def compute_policy_loss_vanilla(
         neg_is_p995 = torch.quantile(neg_valid, 0.995)
         neg_is_p999 = torch.quantile(neg_valid, 0.999)
     else:
-        # 为处理edge case，比如在filter掉废token过多的case时造成完全没用负样本的case (一个偶发现象)
         neg_is_min = torch.tensor(0.0, device=ratio.device)
         neg_is_max = torch.tensor(0.0, device=ratio.device)
         neg_is_p995 = torch.tensor(0.0, device=ratio.device)
         neg_is_p999 = torch.tensor(0.0, device=ratio.device)
         neg_is_p75 = torch.tensor(0.0, device=ratio.device)
 
-    # 正样本is的 max，995 percent，999 percent，50 percent，min
     pos_valid = ratio[(advantages > 0) & response_mask.bool()]
     if pos_valid.numel() > 0:
         pos_is_max = pos_valid.max()
@@ -969,7 +967,7 @@ def compute_policy_loss_future_kl(
     # Notes:
     # This is a current finalized version integrated with vanilla future KL algorithm plus influence weight filter wrt. clip frac low
     # This version is tested with decent performance on 7B. 
-    # This version is going to remove other redunant stats calculation, and include some finalized stats that we actually need for moving forward.
+    # This version is going to remove other redundant stats calculation, and include some finalized stats that we actually need for moving forward.
     #"""
 
     assert config is not None
@@ -1016,8 +1014,8 @@ def compute_policy_loss_future_kl(
 
     future_kl = torch.zeros((batch_size, response_len), device=device, dtype=log_prob.dtype)
     pos_i = torch.arange(response_len, device=device).unsqueeze(1)  # (L,1)
-    # to avoid high is token from the negative sample to deviate our training and weighting 
-    # we exclude those greater than clip_frac_c. These tokens have no gradient either in the following training. 
+    # to avoid high is token from the sample to deviate our training and weighting 
+    # we exclude those greater than clip_frac_c. These tokens have no gradient neither in the following training. 
     filter_threshold = torch.log(torch.tensor(clip_ratio_c, device=device, dtype=log_prob.dtype))    
     is_negative_adv = (advantages < 0)#.view(batch_size, 1) # bsz, L
     ignore_mask = negative_approx_kl > filter_threshold # bsz, L
@@ -1059,8 +1057,8 @@ def compute_policy_loss_future_kl(
         upper_bound = 10.0
         lower_bound = 0.0
         influence_weights = torch.clamp(torch.exp(future_kl),  max=10.0).detach()
-    # 增加一个safe threshold，如果负样本is 的值过大，且weight是增大的趋势，则把它限制到和baseline相同
-    # 目的是为了避免过大的惩罚
+    # Apply a safety threshold: if a negative sample's IS value is too high and its weight is increasing, cap it at the baseline value (1.0)
+    # To avoid over-penalization
     safe_threshold = config.policy_loss.get('safety_thresh', 4.0)
     mask_neg_high_is = (advantages < 0) & (ratio > safe_threshold)
     influence_weights = torch.where(mask_neg_high_is, torch.clamp(influence_weights, min=0.8, max=1.0), influence_weights)
@@ -1100,30 +1098,26 @@ def compute_policy_loss_future_kl(
     pg_clipfrac_lower = verl_F.masked_mean(
         torch.gt(clip_pg_losses1, pg_losses3) * (advantages < 0).float(), response_mask
     )
-    # 现在需要的stats 信息：
+    # Stats info to collect：
     # raw influence weight，lower clip token count, done
-    # 大于2，3，4，10的token负样本比例, done
-    # 负样本 is的max，995 percent，999 percent, done
-    # 正样本 is的max，995 percent，999 percent, done
-    # 极小值is的正样本比例, done
-    # filter 掉的负样本有多少，我们现在筛掉大于10的 1个以上token的sequence, done
-    # 需要存储：(log p diff * response mask), influence weight raw
+    # Percentages of IS negative samples > 2, 3, 4, 10 
+    # Negative sample is: max，995 percent，999 percent, done
+    # Positive sample is: max，995 percent，999 percent, done
+    # Extremely small is from Positive sample (could result in large distribution shift)
 
-    # filter 机制： 如果sequence 中大于clip frac low的token 大于1，我们就把这个sequence的0 mask成0
+    # filter mechanism： if a sequence contains more than 1 token that has been clip by dual clip, then we throw away the entire sequence. 
+    # however, this is rarely activated in the 32b training. 
     lower_clip_mask = (
                         (advantages < 0) &
                         (clip_pg_losses1 > pg_losses3) &
                         response_mask.bool()
                     ) 
-    # 计算当前sequence 有多少是被clip low了的
     low_clip_token_counts = lower_clip_mask.sum(dim=1)  # (batch,）
 
     # sequence-level: whether this entire response should be invalidated
-    #当前做了一个最简单的操作是，如果有一个token被lower clip 掉，则整个sequence都不更新
     seq_has_low_clip = (low_clip_token_counts > 1)        # (batch,) # hard threshold (if sequence has many, > threshold,--> sequence)
     seq_valid_mask = (~seq_has_low_clip).unsqueeze(1)   # (batch,1)
 
-    # final mask - 需要将lower_clip_mask转换为浮点型用于后续计算
     final_mask = response_mask.bool() & seq_valid_mask  # (batch, response_len)
     final_mask_f = final_mask.to(log_prob.dtype)
 
@@ -1131,12 +1125,9 @@ def compute_policy_loss_future_kl(
     pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=final_mask_f, loss_agg_mode=loss_agg_mode)
 
     # Start gathering the rest of stats information
-    #大于2，3，4，10的token负样本比例
-    # 基于负样本中，只有clip frac c的才不会有梯度
     neg_ratio_2_3 = verl_F.masked_mean(((ratio >= 2.0) & (ratio < 3.0) & is_negative_adv).float(), response_mask)
     neg_ratio_3_4 = verl_F.masked_mean(((ratio >= 3.0) & (ratio < 4.0) & is_negative_adv).float(), response_mask)
     neg_ratio_4_10 = verl_F.masked_mean(((ratio >= 4.0) & (ratio < clip_ratio_c) & is_negative_adv).float(), response_mask)
-    # 负样本 is的max，995 percent，999 percent
     neg_valid = ratio[(advantages < 0) & response_mask.bool()]
     if neg_valid.numel() > 0:
         neg_is_max = neg_valid.max()
@@ -1144,13 +1135,11 @@ def compute_policy_loss_future_kl(
         neg_is_p995 = torch.quantile(neg_valid, 0.995)
         neg_is_p999 = torch.quantile(neg_valid, 0.999)
     else:
-        # 为处理edge case，比如在filter掉废token过多的case时造成完全没用负样本的case (一个偶发现象)
         neg_is_max = torch.tensor(0.0, device=ratio.device)
         neg_is_p995 = torch.tensor(0.0, device=ratio.device)
         neg_is_p999 = torch.tensor(0.0, device=ratio.device)
         neg_is_p75 = torch.tensor(0.0, device=ratio.device)
 
-    # 正样本is的 max，995 percent，999 percent，50 percent，min
     pos_valid = ratio[(advantages > 0) & response_mask.bool()]
     if pos_valid.numel() > 0:
         pos_is_max = pos_valid.max()
@@ -1170,7 +1159,6 @@ def compute_policy_loss_future_kl(
         pos_is_p999 = torch.tensor(0.0, device=ratio.device)
         pos_is_min = torch.tensor(0.0, device=ratio.device)
 
-    # 极小值is的正样本比例 
     pos_mini_frac = verl_F.masked_mean(((ratio < 1e-3) & (advantages > 0)).float(), response_mask)
 
     return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower, influence_weights_mean, influence_weights_min, influence_weights_max, total_clip_frac, clip_frac_upper, clip_frac_lower, \
