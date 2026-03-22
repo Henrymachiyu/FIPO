@@ -5,7 +5,7 @@
 **Qwen Pilot, Alibaba Group | Published on March 20, 2026**
 
 
-**Official GitHub page has been moved to:** [Official GitHub]([https://github.com/Henrymachiyu/FIPO](https://github.com/qwenpilot/FIPO))
+**Official GitHub page has been moved to:** [Official GitHub](https://github.com/qwenpilot/FIPO)
 
 
 
